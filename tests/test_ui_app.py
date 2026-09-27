@@ -1,28 +1,42 @@
 """UI controller tests.
 
-Tk needs a display, so the whole module is skipped when one is unavailable
-(headless Linux CI). The regression these guard against is important: results
-posted from worker threads never reach the UI if they are handed to Tk's
-``after`` from a non-main thread, which silently leaves the app empty.
+Tk needs a display and a window server, and runner environments differ wildly
+(Windows runners have one, Linux CI usually does not, macOS runners are slow to
+service Tk). These tests therefore only run when explicitly requested with
+``APEX_DNS_UI_TESTS=1`` *and* a Tk probe succeeds; CI enables them on Windows.
+
+The regression they guard against is important: results posted from worker
+threads never reach the UI if they are handed to Tk's ``after`` from a non-main
+thread, which silently leaves the app empty.
 """
 
 from __future__ import annotations
 
+import os
 import time
 import unittest
 
 from core.dns_service import AdapterInfo, DnsBackend, DnsService
 from tests import ROOT  # noqa: F401
 
-try:
-    import tkinter as tk
+UI_TESTS = os.environ.get("APEX_DNS_UI_TESTS") == "1"
+_TK_WORKS = False
 
-    _probe = tk.Tk()
-    _probe.withdraw()
-    _probe.destroy()
-    TK_AVAILABLE = True
-except Exception:  # pragma: no cover - headless environments
-    TK_AVAILABLE = False
+if UI_TESTS:
+    try:
+        import tkinter as tk
+
+        _probe = tk.Tk()
+        _probe.withdraw()
+        _probe.destroy()
+        _TK_WORKS = True
+    except Exception:  # pragma: no cover - no usable display
+        _TK_WORKS = False
+else:
+    try:
+        import tkinter as tk  # noqa: F401
+    except Exception:  # pragma: no cover - tkinter not installed
+        tk = None  # type: ignore[assignment]
 
 
 class StubBackend(DnsBackend):
@@ -49,7 +63,7 @@ class StubBackend(DnsBackend):
         self.reset_calls.append(adapter)
 
 
-@unittest.skipUnless(TK_AVAILABLE, "Tk display not available")
+@unittest.skipUnless(UI_TESTS and _TK_WORKS, "set APEX_DNS_UI_TESTS=1 and require a Tk display")
 class TestAppController(unittest.TestCase):
     def setUp(self):
         from unittest import mock
