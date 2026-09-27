@@ -8,20 +8,20 @@ Items are ordered by impact-per-effort.
 
 ## v2.1 — Ship quality and everyday usability
 
-- [ ] **Code-sign the executables.** Unsigned binaries trigger SmartScreen
-      "Windows protected your PC" on first run, which is the single biggest
-      barrier to distributing them. Requires an Authenticode certificate.
-- [ ] **Installer and Start menu entry.** An Inno Setup or MSIX installer with
-      an uninstaller, file associations for the report output and a Start menu
-      shortcut that carries the elevation flag.
-- [ ] **Auto-update.** Signed releases with a lightweight check; the app is
-      currently frozen at whatever version was downloaded.
-- [ ] **Persist user settings.** Last selected adapter, provider and window
-      geometry are not remembered between runs.
-- [ ] **Localization.** Strings are hardcoded Turkish. Extract them so the
-      English UI in this changelog is not aspirational.
-- [ ] **Failure reporting.** "Some servers did not respond" is the only
-      diagnosis a user gets. Surface per-adapter errors in a detail view.
+- [x] **Code-sign the executables.** `packaging/sign.ps1` signs with
+      Authenticode and `build.ps1` calls it. **The certificate is still
+      missing**, so binaries remain unsigned and SmartScreen still warns.
+      Supply one via `APEX_CERT_THUMBPRINT` to close this.
+- [x] **Installer and Start menu entry.** `packaging/apex_dns.iss`, with
+      optional desktop shortcut. Not yet compiled: Inno Setup is not
+      installed locally, so it is verified by inspection only.
+- [x] **Auto-update.** `core/updater.py` plus a startup prompt and
+      `--check-update`. Not yet exercised against a live release, because the
+      repository is not published.
+- [x] **Persist user settings.** `core/settings.py`, atomic and
+      corruption-tolerant.
+- [x] **Localization.** Turkish and English across UI, report and CLI.
+- [x] **Failure reporting.** `ui/details.py` connection detail window.
 
 ## v2.2 — Networking depth
 
@@ -56,3 +56,5 @@ Items are ordered by impact-per-effort.
 - Encrypted DNS as the default rather than an opt-in measurement.
 - Per-domain override table.
 - Telemetry, opt-in and off by default.
+- Publish the repository so releases exist and auto-update has something to
+  find; this currently blocks verifying both the installer and the updater.

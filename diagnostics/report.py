@@ -7,10 +7,12 @@ import platform
 import sys
 
 from core import elevation, resolver, system
+from core import settings as settings_store
 from core.dns_service import DnsService
 from core.providers import measurable_providers
 from diagnostics.netusage import get_top_network_usage
 from diagnostics.speedtest import test_latency_and_loss, test_speed
+from i18n import t
 
 RULE = "=" * 52
 
@@ -24,7 +26,7 @@ def summarize_loss(ping_output: str) -> str | None:
     loss = system.parse_ping_loss(ping_output)
     if loss is None:
         return tail or None
-    return f"{loss}% kayıp — {tail}".strip(" —")
+    return f"{loss}% {t('report.lost')} — {tail}".strip(" —")
 
 
 def collect_dns_results(timeout: float = 1.2) -> dict[str, float | None]:
@@ -98,6 +100,7 @@ def build_report(quick: bool = False) -> dict:
             "rtt_ms": ipv6.rtt_ms,
             "detail": ipv6.detail,
         },
+        "settings_path": str(settings_store.settings_path()),
         "ping_output": ping_output,
         "loss_summary": summarize_loss(ping_output),
         "speed": {"download_mbps": down_mbps, "upload_mbps": up_mbps},
@@ -106,31 +109,36 @@ def build_report(quick: bool = False) -> dict:
 
 
 def _print_dns(report: dict, out) -> None:
-    print("--- DNS Yanıt Süreleri (UDP/53) ---", file=out)
+    print(f"--- {t('report.dns_section')} ---", file=out)
     for name, latency in report["dns"].items():
-        value = f"{latency} ms" if latency is not None else "Zaman Aşımı"
+        value = f"{latency} ms" if latency is not None else t("report.dns_timeout")
         print(f"  {name}: {value}", file=out)
 
 
 def _print_doh(report: dict, out) -> None:
     if not report["doh"]:
         return
-    print("\n--- DNS over HTTPS (DoH) ---", file=out)
+    print(f"\n--- {t('report.doh_section')} ---", file=out)
     for name, entry in report["doh"].items():
         if entry["ok"]:
             print(f"  {name}: {entry['rtt_ms']} ms  [{entry['rcode']}]", file=out)
         else:
-            print(f"  {name}: başarısız ({entry['error'] or entry['rcode']})", file=out)
+            print(f"  {name}: {t('report.doh_failed', reason=entry['error'] or entry['rcode'])}", file=out)
 
 
 def _print_ipv6(report: dict, out) -> None:
     ipv6 = report["ipv6"]
-    print("\n--- IPv6 ---", file=out)
-    print(f"  Durum: {ipv6['detail']}", file=out)
+    yes, no = t("report.yes"), t("report.no")
+    print(f"\n--- {t('report.ipv6_section')} ---", file=out)
+    print(f"  {t('report.status')}: {ipv6['detail']}", file=out)
     print(
-        f"  Yığın: {'var' if ipv6['supported'] else 'yok'} | "
-        f"Genel adres: {'var' if ipv6['has_global_address'] else 'yok'} | "
-        f"AAAA çözümü: {'var' if ipv6['resolves_aaaa'] else 'yok'}",
+        "  "
+        + t(
+            "report.ipv6_stack",
+            stack=yes if ipv6["supported"] else no,
+            global_addr=yes if ipv6["has_global_address"] else no,
+            aaaa=yes if ipv6["resolves_aaaa"] else no,
+        ),
         file=out,
     )
 
@@ -138,15 +146,15 @@ def _print_ipv6(report: dict, out) -> None:
 def _print_adapters(report: dict, out) -> None:
     if not report["adapters"]:
         if report["adapters_error"]:
-            print(f"\n--- Ağ Bağlantıları okunamadı: {report['adapters_error']} ---", file=out)
+            print(f"\n--- {t('report.adapters_unreadable', reason=report['adapters_error'])} ---", file=out)
         return
-    print("\n--- Ağ Bağlantıları ---", file=out)
+    print(f"\n--- {t('report.adapters_section')} ---", file=out)
     for adapter in report["adapters"]:
         flags = []
         if adapter["dhcp_enabled"]:
-            flags.append("DHCP")
+            flags.append(t("report.dhcp"))
         if adapter["is_virtual"]:
-            flags.append("sanal")
+            flags.append(t("report.virtual"))
         suffix = f"  ({', '.join(flags)})" if flags else ""
         print(f"  {adapter['name']}  [{adapter['status']}]{suffix}", file=out)
 
@@ -154,14 +162,14 @@ def _print_adapters(report: dict, out) -> None:
 def _print_summary(report: dict, out) -> None:
     down_mbps = report["speed"]["download_mbps"]
     if down_mbps and down_mbps < 5:
-        print(f"Bant genişliği düşük görünüyor: {down_mbps} Mbps", file=out)
+        print(t("report.low_bandwidth", value=down_mbps), file=out)
     if any(latency is None or latency >= 100 for latency in report["dns"].values()):
-        print("DNS gecikmesi yüksek. 1.1.1.1 veya 8.8.8.8 deneyin.", file=out)
+        print(t("report.high_dns_latency"), file=out)
     loss_summary = report["loss_summary"]
-    if loss_summary and "0% kayıp" not in loss_summary:
-        print(f"Paket kaybı tespit edildi: {loss_summary}", file=out)
+    if loss_summary and t("report.no_loss") not in loss_summary:
+        print(t("report.packet_loss", summary=loss_summary), file=out)
     if not report["ipv6"]["has_global_address"]:
-        print("IPv6 genel adresi yok. Bazı servisler IPv6'yı tercih ettiği için yavaşlık olabilir.", file=out)
+        print(t("report.no_ipv6"), file=out)
 
 
 def run_diagnostics(quick: bool = False, stream=None) -> dict:
@@ -170,7 +178,7 @@ def run_diagnostics(quick: bool = False, stream=None) -> dict:
     out = stream if stream is not None else sys.stdout
 
     print(RULE, file=out)
-    print("      GELİŞMİŞ İNTERNET TEŞHİS RAPORU", file=out)
+    print(f"      {t('report.title')}", file=out)
     print(RULE, file=out)
 
     _print_dns(report, out)
@@ -178,27 +186,27 @@ def run_diagnostics(quick: bool = False, stream=None) -> dict:
     _print_ipv6(report, out)
     _print_adapters(report, out)
 
-    print("\n--- Ping & Paket Kaybı ---", file=out)
+    print(f"\n--- {t('report.ping_section')} ---", file=out)
     for line in (report["ping_output"] or "").splitlines()[-4:]:
         print(f"  {line}", file=out)
 
     if not quick:
-        print("\n--- Bant Genişliği ---", file=out)
-        print(f"  İndirme Hızı: {report['speed']['download_mbps']} Mbps", file=out)
-        print(f"  Yükleme Hızı: {report['speed']['upload_mbps']} Mbps", file=out)
+        print(f"\n--- {t('report.speed_section')} ---", file=out)
+        print("  " + t("report.download", value=report["speed"]["download_mbps"]), file=out)
+        print("  " + t("report.upload", value=report["speed"]["upload_mbps"]), file=out)
         public_ip = report["platform"].get("public_ipv4")
         if public_ip:
-            print(f"  Açık IP: {public_ip}", file=out)
+            print("  " + t("report.public_ip", value=public_ip), file=out)
 
-        print("\n--- En Çok Ağ Kullanan İşlemler ---", file=out)
+        print(f"\n--- {t('report.apps_section')} ---", file=out)
         if report["top_apps"]:
             for app in report["top_apps"]:
                 print(f"  {app['name']}: ~{app['kb']} KB", file=out)
         else:
-            print("  Belirgin ağ kullanımı tespit edilmedi.", file=out)
+            print("  " + t("report.no_usage"), file=out)
 
     print("\n" + RULE, file=out)
-    print("                TEŞHİS ÖZETİ", file=out)
+    print(f"                {t('report.summary_title')}", file=out)
     print(RULE, file=out)
     _print_summary(report, out)
     return report
@@ -212,8 +220,8 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
     import json
 
-    parser = argparse.ArgumentParser(prog="apex-dns-diagnostics", description="Apex DNS teşhis raporu")
-    parser.add_argument("--quick", action="store_true", help="Hız testi ve süreç taramasını atla")
+    parser = argparse.ArgumentParser(prog="apex-dns-diagnostics", description=t("cli.report_description"))
+    parser.add_argument("--quick", action="store_true", help=t("cli.quick"))
     args = parser.parse_args(argv)
 
     if os.environ.get("APEX_DNS_JSON"):

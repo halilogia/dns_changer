@@ -44,7 +44,7 @@ HIDDEN = [
     "urllib3",
     "charset_normalizer",
     "idna",
-] + collect_submodules("core") + collect_submodules("diagnostics")
+] + collect_submodules("core") + collect_submodules("diagnostics") + collect_submodules("i18n")
 
 EXCLUDED = ["tkinter.test", "unittest", "pydoc_data", "doctest"]
 

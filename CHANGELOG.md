@@ -5,6 +5,83 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-09-27
+
+Completes the v2.1 roadmap. Not yet pushed to a release.
+
+### Added
+
+**Localization**
+- `i18n` package with Turkish and English catalogs covering the UI, the
+  diagnostics report and the CLI. 150 keys, with a test asserting both
+  catalogs expose the same keys and the same `{placeholder}` set.
+- Locale resolves from `--locale`, then the saved setting, then the
+  environment (`APEX_DNS_LOCALE`, `LANG`, ...), then
+  `GetUserDefaultUILanguage` on Windows.
+- Localized provider names, descriptions, badges and card placeholders. Text
+  is stored as catalog keys and resolved on access, so switching language takes
+  effect immediately rather than only at import time.
+- An AST-based test rejects hardcoded Turkish literals in the UI, diagnostics
+  and CLI modules, so translations cannot silently regress.
+
+**Settings**
+- `core/settings.py` persists the last selected adapter and provider, custom
+  DNS addresses, window geometry, language and update preference as JSON in the
+  per-user application data directory.
+- Writes are atomic (temp file plus `os.replace`) and a corrupt or unreadable
+  file falls back to defaults instead of blocking startup.
+- The update preference is seeded from the value the installer writes to
+  `HKCU\Software\Apex DNS Changer`, so an opt-out during setup is honoured.
+  Once the user has saved settings, their stored value wins.
+
+**Auto-update**
+- `core/updater.py` queries the GitHub releases API and compares versions.
+  Network, HTTP and JSON failures return a structured error instead of raising.
+- A startup prompt offers the download page when a newer release exists. Only
+  runs for frozen builds, and `--no-update-check` disables it permanently.
+- `--check-update` performs the same check from the command line.
+- The check sends a `User-Agent`; the default urllib agent is refused by the
+  GitHub API.
+
+**Failure reporting**
+- `ui/details.py` adds a connection detail window listing every adapter with
+  its status, configured DNS servers, DHCP flag, addresses and any backend
+  error, plus a summary count of how many connections are up.
+- A new `DETAILS` button in the status bar opens it. Failures no longer reduce
+  to "some servers did not respond".
+
+**Packaging**
+- `packaging/sign.ps1` signs the built executables with Authenticode, using
+  `signtool.exe` when present and `Set-AuthenticodeSignature` otherwise. The
+  thumbprint comes from `-Thumbprint` or `APEX_CERT_THUMBPRINT`. With no
+  certificate it explains the SmartScreen consequence and exits 0, so
+  unsigned local builds still work; `-RequireSignature` turns that into a
+  failure for CI.
+- `packaging/apex_dns.iss` is an Inno Setup 6 installer with a Start menu
+  group, an optional desktop shortcut and a post-install launch.
+- `build.ps1` gained `-SkipSigning` and invokes the signing step.
+
+### Changed
+
+- `DnsProvider` stores `name_key` / `desc_key` / `badge_key` instead of
+  literal text, with `label` / `desc` / `badge` properties resolving them.
+- `Ipv6Status.detail` became a `detail_key` plus a resolving property, so the
+  IPv6 summary is localized.
+- The status bar has a fifth button, so the four action buttons are now laid
+  out across five equal columns.
+- `--help` and the subcommand descriptions are localized; the locale is now
+  resolved before the argument parser is built.
+
+### Fixed
+
+- `ApexDNSDiagnostics.exe` with no arguments started the GUI, because both
+  executables are built from the same entry point and `main` defaulted to
+  `gui`. The default command is now chosen from the executable name.
+- The diagnostics report embedded a `Path` object for the settings location,
+  which made `diagnostics-json` fail to serialize. It is now a string.
+- Tk `Frame` constructor padding was passed as a 2- or 4-tuple, which Tcl
+  rejects; asymmetric padding belongs on the geometry manager.
+
 ## [2.0.0] - 2026-09-27
 
 Total rewrite. The 718-line `dns_changer.py` monolith became a layered package

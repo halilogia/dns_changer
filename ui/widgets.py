@@ -7,6 +7,7 @@ from tkinter import ttk
 
 from core.dns_service import is_valid_ip
 from core.providers import DnsProvider
+from i18n import t
 from ui import theme
 
 INDICATOR_SIZE = 12
@@ -142,19 +143,19 @@ class DnsCard(tk.Frame):
 
     def set_measuring(self) -> None:
         self.badge_star.configure(text="")
-        self.latency.configure(text="Ölçülüyor...", fg=theme.COLOR_TEXT_MUTED)
+        self.latency.configure(text=t("card.measuring"), fg=theme.COLOR_TEXT_MUTED)
 
     def set_latency(self, latency_ms: float | None, doh_ms: float | None = None) -> None:
         if latency_ms is None:
-            self.latency.configure(text="Zaman Aşımı", fg=theme.COLOR_RED)
+            self.latency.configure(text=t("card.timeout"), fg=theme.COLOR_RED)
             return
         base = f"{int(latency_ms)} ms"
         if doh_ms is not None:
             base = f"{base}\nDoH {int(doh_ms)} ms"
         self.latency.configure(text=base, fg=theme.latency_color(latency_ms))
 
-    def set_fastest(self, text: str = "⭐ En Hızlı") -> None:
-        self.badge_star.configure(text=text)
+    def set_fastest(self, text: str | None = None) -> None:
+        self.badge_star.configure(text=text or t("card.fastest"))
 
     def set_addresses(self, primary: str, secondary: str = "") -> None:
         updated = self.provider.as_custom(primary, secondary)
@@ -266,7 +267,7 @@ class AdapterBar(tk.Frame):
         self._suppress = False
 
         tk.Label(
-            self, text="Aktif Bağlantı:", font=theme.FONT_CARD_TITLE, fg=theme.COLOR_TEXT_PRIMARY, bg=theme.COLOR_BG
+            self, text=t("adapter.label"), font=theme.FONT_CARD_TITLE, fg=theme.COLOR_TEXT_PRIMARY, bg=theme.COLOR_BG
         ).grid(row=0, column=0, sticky="w", pady=5)
 
         self.selected = tk.StringVar()
@@ -276,7 +277,7 @@ class AdapterBar(tk.Frame):
 
         self.current = tk.Label(
             self,
-            text="Mevcut DNS: tespit ediliyor...",
+            text=t("status.scanning_adapters"),
             font=theme.FONT_SUBTITLE,
             fg=theme.COLOR_TEXT_MUTED,
             bg=theme.COLOR_BG,
@@ -297,19 +298,17 @@ class AdapterBar(tk.Frame):
             self._suppress = False
 
     def show_multiple(self) -> None:
-        self.current.configure(text="Mevcut DNS: Çoklu Seçim", fg=theme.COLOR_TEXT_MUTED)
+        self.current.configure(text=t("adapter.current.multi"), fg=theme.COLOR_TEXT_MUTED)
 
     def show_servers(self, servers: list[str], uses_dhcp: bool) -> None:
         if not servers:
-            self.current.configure(text="Mevcut DNS: Otomatik (DHCP)", fg=theme.COLOR_TEXT_MUTED)
+            self.current.configure(text=t("adapter.current.auto"), fg=theme.COLOR_TEXT_MUTED)
             return
-        text = f"Mevcut DNS: {', '.join(servers)}"
-        if uses_dhcp:
-            text += " (DHCP)"
-        self.current.configure(text=text, fg=theme.COLOR_GREEN)
+        key = "adapter.current.dhcp" if uses_dhcp else "adapter.current.servers"
+        self.current.configure(text=t(key, servers=", ".join(servers)), fg=theme.COLOR_GREEN)
 
     def show_error(self, message: str) -> None:
-        self.current.configure(text=f"Mevcut DNS: okunamadı ({message})", fg=theme.COLOR_RED)
+        self.current.configure(text=t("adapter.current.unreadable", reason=message), fg=theme.COLOR_RED)
 
     def value(self) -> str:
         return self.selected.get()
@@ -332,11 +331,15 @@ class CustomDnsForm(tk.Frame):
         self.secondary = tk.StringVar()
 
         tk.Label(
-            self, text="Birincil DNS:", font=theme.FONT_CARD_TEXT, fg=theme.COLOR_TEXT_PRIMARY, bg=theme.COLOR_CARD
+            self, text=t("custom.primary"), font=theme.FONT_CARD_TEXT, fg=theme.COLOR_TEXT_PRIMARY, bg=theme.COLOR_CARD
         ).grid(row=0, column=0, padx=15, pady=10, sticky="w")
         self.primary_entry = self._entry(0, 1, self.primary)
         tk.Label(
-            self, text="İkincil DNS:", font=theme.FONT_CARD_TEXT, fg=theme.COLOR_TEXT_PRIMARY, bg=theme.COLOR_CARD
+            self,
+            text=t("custom.secondary"),
+            font=theme.FONT_CARD_TEXT,
+            fg=theme.COLOR_TEXT_PRIMARY,
+            bg=theme.COLOR_CARD,
         ).grid(row=0, column=2, padx=15, pady=10, sticky="w")
         self.secondary_entry = self._entry(0, 3, self.secondary)
 
@@ -372,11 +375,11 @@ class CustomDnsForm(tk.Frame):
 
     def _show_hint(self, primary: str, secondary: str) -> None:
         if primary and not is_valid_ip(primary):
-            self.hint.configure(text=f"Birincil adres geçersiz: {primary}", fg=theme.COLOR_RED)
+            self.hint.configure(text=t("custom.invalid.primary", value=primary), fg=theme.COLOR_RED)
         elif secondary and not is_valid_ip(secondary):
-            self.hint.configure(text=f"İkincil adres geçersiz: {secondary}", fg=theme.COLOR_RED)
+            self.hint.configure(text=t("custom.invalid.secondary", value=secondary), fg=theme.COLOR_RED)
         elif primary:
-            self.hint.configure(text="IPv4 veya IPv6 adresi kullanabilirsiniz.", fg=theme.COLOR_GREEN)
+            self.hint.configure(text=t("custom.hint.ok"), fg=theme.COLOR_GREEN)
         else:
             self.hint.configure(text="")
 
@@ -388,12 +391,17 @@ class CustomDnsForm(tk.Frame):
 
 
 class StatusFooter(tk.Frame):
-    """Status line plus the three action buttons."""
+    """Status line plus the action buttons."""
 
-    def __init__(self, master, *, on_test, on_reset, on_apply, on_doh) -> None:
+    def __init__(self, master, *, on_test, on_reset, on_apply, on_doh, on_details=None) -> None:
         super().__init__(master, bg=theme.COLOR_BG, pady=18, padx=25)
         self.status = tk.Label(
-            self, text="Hazır.", font=theme.FONT_SUBTITLE, fg=theme.COLOR_TEXT_MUTED, bg=theme.COLOR_BG, anchor="w"
+            self,
+            text=t("status.ready"),
+            font=theme.FONT_SUBTITLE,
+            fg=theme.COLOR_TEXT_MUTED,
+            bg=theme.COLOR_BG,
+            anchor="w",
         )
         self.status.pack(anchor="w", fill="x", pady=(0, 10))
 
@@ -401,20 +409,24 @@ class StatusFooter(tk.Frame):
         row.pack(fill="x")
         self.buttons: dict[str, tk.Button] = {}
 
-        self.buttons["test"] = self._button(row, "⚡ HIZ TESTİ", theme.COLOR_CYAN, on_test, 0, (0, 5))
-        self.buttons["doh"] = self._button(row, "🔒 DOH / IPv6", theme.COLOR_AMBER, on_doh, 1, (5, 5))
-        self.buttons["reset"] = self._button(row, "🔄 DHCP (VARSAYILAN)", theme.COLOR_RED, on_reset, 2, (5, 5))
+        self.buttons["test"] = self._button(row, t("button.test"), theme.COLOR_CYAN, on_test, 0, (0, 5))
+        self.buttons["doh"] = self._button(row, t("button.doh"), theme.COLOR_AMBER, on_doh, 1, (5, 5))
+        self.buttons["reset"] = self._button(row, t("button.reset"), theme.COLOR_RED, on_reset, 2, (5, 5))
+        if on_details is not None:
+            self.buttons["details"] = self._button(
+                row, t("button.details"), theme.COLOR_TEXT_MUTED, on_details, 3, (5, 5)
+            )
         self.buttons["apply"] = self._button(
             row,
-            "✅ DNS UYGULA",
+            t("button.apply"),
             theme.COLOR_TEXT_PRIMARY,
             on_apply,
-            3,
+            4,
             (5, 0),
             background=theme.COLOR_ACCENT,
             hover=theme.COLOR_ACCENT_HOVER,
         )
-        for column in range(4):
+        for column in range(5):
             row.columnconfigure(column, weight=1)
 
     def _button(self, parent, text, color, command, column, padx, background=None, hover=None) -> tk.Button:

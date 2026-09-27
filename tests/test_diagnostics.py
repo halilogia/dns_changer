@@ -258,6 +258,13 @@ class TestBuildReportShape(unittest.TestCase):
         self.assertIn("dns_backend", data["platform"])
         self.assertIn("is_admin", data["platform"])
 
+    def test_settings_path_is_json_safe(self):
+        import json
+
+        data = report.build_report(quick=True)
+        self.assertIsInstance(data["settings_path"], str)
+        json.dumps(data)
+
 
 class TestCLI(unittest.TestCase):
     def test_parser_builds(self):

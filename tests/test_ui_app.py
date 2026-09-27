@@ -97,7 +97,7 @@ class TestAppController(unittest.TestCase):
         self.assertIn("DHCP", text)
 
     def test_all_action_buttons_exist(self):
-        self.assertEqual(sorted(self.app.footer.buttons), ["apply", "doh", "reset", "test"])
+        self.assertEqual(sorted(self.app.footer.buttons), ["apply", "details", "doh", "reset", "test"])
 
     def test_worker_results_reach_the_ui(self):
         # The regression: adapters were never populated because worker results
@@ -151,10 +151,30 @@ class TestAppController(unittest.TestCase):
         self.assertIn("yanıt vermedi", self.app.footer.status.cget("text"))
 
     def test_adapter_key_maps_multi_select_to_sentinel(self):
-        from core.providers import ALL_ADAPTERS_ID, ALL_ADAPTERS_LABEL
+        from core.providers import ALL_ADAPTERS_ID, all_adapters_label
 
-        self.assertEqual(self.app._adapter_key(ALL_ADAPTERS_LABEL), ALL_ADAPTERS_ID)
+        self.assertEqual(self.app._adapter_key(all_adapters_label()), ALL_ADAPTERS_ID)
         self.assertEqual(self.app._adapter_key("Ethernet"), "Ethernet")
+
+    def test_details_button_opens_a_window(self):
+        from i18n import set_locale
+        from ui.details import AdapterDetail, DetailReport, DetailsWindow
+
+        report = DetailReport(
+            rows=[
+                AdapterDetail(name="Ethernet", status="Up", servers=("1.1.1.1",), dhcp=True),
+                AdapterDetail(name="Wi-Fi", status="Disconnected"),
+            ]
+        )
+        window = DetailsWindow(self.root, report)
+        self.pump(0.2)
+        self.assertEqual(len(window.report.rows), 2)
+        try:
+            set_locale("en")
+            self.assertEqual(window._summary_text(), "2 connection(s) | 1 up, 1 down")
+        finally:
+            set_locale("tr")
+        window.destroy()
 
     def test_apply_reaches_the_backend(self):
         self.app.provider_list.select(0)

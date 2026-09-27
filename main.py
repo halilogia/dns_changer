@@ -17,10 +17,15 @@ import argparse
 import contextlib
 import json
 import sys
+from pathlib import Path
 
-from core import elevation, resolver, system
+from core import elevation, resolver, system, updater
+from core import settings as settings_store
 from core.dns_service import DnsService
 from core.providers import DEFAULT_PROVIDERS, doh_providers
+from i18n import detect_locale, set_locale, t
+
+APP_VERSION = "2.0.0"
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -36,30 +41,33 @@ def _configure_console() -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="apex-dns",
-        description="Apex DNS Changer - DNS yönetimi ve ağ teşhisi",
+        description=t("cli.description"),
     )
-    parser.add_argument("--version", action="version", version="apex-dns 2.0.0")
+    parser.add_argument("--version", action="version", version=f"apex-dns {APP_VERSION}")
+    parser.add_argument("--locale", help=t("cli.locale"))
+    parser.add_argument("--check-update", action="store_true", help=t("cli.check_update"))
+    parser.add_argument("--no-update-check", action="store_true", help=t("cli.no_update_check"))
     sub = parser.add_subparsers(dest="command")
 
-    diagnostics = sub.add_parser("diagnostics", help="konsol teşhis raporu")
-    diagnostics.add_argument("--quick", action="store_true", help="yavaş ölçümleri atla")
+    diagnostics = sub.add_parser("diagnostics", help=t("cli.report_description"))
+    diagnostics.add_argument("--quick", action="store_true", help=t("cli.quick"))
 
-    sub.add_parser("diagnostics-json", help="JSON teşhis raporu")
+    sub.add_parser("diagnostics-json", help=t("cli.report_description"))
 
-    ping = sub.add_parser("ping", help="ping ve paket kaybı ölçümü")
+    ping = sub.add_parser("ping", help=t("cli.ping"))
     ping.add_argument("host", nargs="?", default="8.8.8.8")
-    ping.add_argument("-c", "--count", type=int, default=10)
+    ping.add_argument("-c", "--count", type=int, default=10, help=t("cli.count"))
 
-    sub.add_parser("speed", help="bant genişliği ölçümü")
-    sub.add_parser("doh", help="DoH ve IPv6 testi")
-    sub.add_parser("adapters", help="ağ bağlantılarını listele")
-    sub.add_parser("providers", help="DNS sağlayıcı listesini yazdır")
+    sub.add_parser("speed", help=t("cli.speed_test"))
+    sub.add_parser("doh", help=t("cli.dohtest"))
+    sub.add_parser("adapters", help=t("cli.adapters"))
+    sub.add_parser("providers", help=t("cli.providers"))
 
-    gui = sub.add_parser("gui", help="grafik arayüzü başlat")
+    gui = sub.add_parser("gui", help=t("cli.gui"))
     gui.add_argument(
         "--no-elevation",
         action="store_true",
-        help="UAC yeniden başlatmayı atla (yönetici olmadan çalıştırmak için)",
+        help=t("cli.no_elevation"),
     )
     return parser
 
@@ -86,7 +94,8 @@ def _cmd_ping(args) -> int:
     print(output)
     summary = summarize_loss(output)
     if summary:
-        print(f"\nÖzet: {summary}")
+        print("")
+    print(t("cli.summary", value=summary))
     return EXIT_OK
 
 
@@ -94,23 +103,23 @@ def _cmd_speed(_args) -> int:
     from diagnostics.speedtest import test_speed
 
     down, up = test_speed()
-    print(f"İndirme: {down} Mbps")
-    print(f"Yükleme: {up} Mbps")
+    print(t("report.download_short", value=down))
+    print(t("report.upload_short", value=up))
     return EXIT_OK if down or up else EXIT_ERROR
 
 
 def _cmd_doh(_args) -> int:
-    print("--- DoH ---")
+    print(f"--- {t('report.doh_section')} ---")
     reachable = 0
     for provider in doh_providers():
         result = resolver.measure_doh_latency(provider)
         if result.ok:
             reachable += 1
-            print(f"  {provider.name}: {result.rtt_ms} ms  [{result.rcode}]")
+            print(f"  {provider.label}: {result.rtt_ms} ms  [{result.rcode}]")
         else:
-            print(f"  {provider.name}: başarısız ({result.error or result.rcode})")
+            print(f"  {provider.label}: {t('report.doh_failed', reason=result.error or result.rcode)}")
     ipv6 = resolver.probe_ipv6()
-    print("\n--- IPv6 ---")
+    print(f"\n--- {t('report.ipv6_section')} ---")
     print(f"  {ipv6.detail}")
     return EXIT_OK if reachable or ipv6.has_global_address else EXIT_ERROR
 
@@ -120,18 +129,19 @@ def _cmd_adapters(_args) -> int:
     try:
         adapters = service.adapters(refresh=True)
     except Exception as exc:
-        print(f"Bağlantılar okunamadı: {exc}", file=sys.stderr)
+        print(t("cli.adapters_unreadable", reason=exc), file=sys.stderr)
         return EXIT_ERROR
     if not adapters:
-        print("Ağ bağlantısı bulunamadı.")
+        print(t("cli.no_adapter_found"))
         return EXIT_ERROR
-    print(f"Backend: {service.backend_name}  (yazma: {'var' if service.can_write else 'yok'})")
+    write_label = t("report.yes") if service.can_write else t("report.no")
+    print(t("report.backend", name=service.backend_name, write=write_label))
     for adapter in adapters:
         flags = []
         if adapter.dhcp_enabled:
-            flags.append("DHCP")
+            flags.append(t("report.dhcp"))
         if adapter.is_virtual:
-            flags.append("sanal")
+            flags.append(t("report.virtual"))
         suffix = f"  [{', '.join(flags)}]" if flags else ""
         print(f"  {adapter.name}  ({adapter.status}){suffix}")
         try:
@@ -146,8 +156,9 @@ def _cmd_adapters(_args) -> int:
 def _cmd_providers(_args) -> int:
     for provider in DEFAULT_PROVIDERS:
         addresses = provider.display_servers()
+        name = provider.label
         doh = f"  DoH: {provider.doh_url}" if provider.supports_doh else ""
-        print(f"  {provider.name}: {addresses}{doh}")
+        print(f"  {name}: {addresses}{doh}")
     return EXIT_OK
 
 
@@ -173,21 +184,81 @@ _COMMANDS = {
 }
 
 
+def _apply_locale(requested: str | None) -> str:
+    """Settings win, then the flag, then the environment."""
+    if requested:
+        return set_locale(requested)
+    stored = settings_store.load_settings().locale
+    return set_locale(stored or detect_locale())
+
+
+def _default_command() -> str:
+    """The diagnostics build must not fall through to the GUI.
+
+    Both executables are built from this entry point, so the console build
+    would otherwise open a window instead of printing a report.
+    """
+    if system.is_frozen() and Path(sys.executable).stem.lower().startswith("apexdnsdiagnostics"):
+        return "diagnostics"
+    return "gui"
+
+
+def _cmd_check_update(_args) -> int:
+    info = updater.check_for_update(APP_VERSION)
+    if info.error:
+        print(t("status.update_failed", error=info.error), file=sys.stderr)
+        return EXIT_ERROR
+    if not info.available:
+        print(t("status.update_none", version=info.current))
+        return EXIT_OK
+    print(t("status.update_available", version=info.latest))
+    if info.url:
+        print(info.url)
+    return EXIT_OK
+
+
+def _prescan_locale(argv: list[str]) -> str:
+    """Find --locale before the parser exists, so --help is localized too."""
+    for index, token in enumerate(argv):
+        if token == "--locale" and index + 1 < len(argv):
+            return argv[index + 1]
+        if token.startswith("--locale="):
+            return token.split("=", 1)[1]
+    return ""
+
+
 def main(argv: list[str] | None = None) -> int:
     _configure_console()
+    arguments = list(argv) if argv is not None else sys.argv[1:]
+    settings = settings_store.load_settings()
+
+    # Resolve the locale before building the parser, otherwise help text and
+    # subcommand descriptions are rendered in the default language.
+    _apply_locale(_prescan_locale(arguments) or settings.locale or None)
+
     parser = build_parser()
-    args = parser.parse_args(argv if argv is not None else sys.argv[1:])
-    command = args.command or "gui"
+    args = parser.parse_args(arguments)
+    if getattr(args, "locale", None):
+        _apply_locale(args.locale)
+
+    if getattr(args, "no_update_check", False):
+        settings.check_updates = False
+        settings_store.save_settings(settings)
+
+    if getattr(args, "check_update", False):
+        return _cmd_check_update(args)
+
+    command = args.command or _default_command()
     if args.command is None:
-        args.no_elevation = False
+        args.no_elevation = command != "gui"
     try:
         return _COMMANDS[command](args)
     except KeyboardInterrupt:
         return 130
     except Exception as exc:
-        if "--debug" in (argv or sys.argv):
+        if "--debug" in arguments:
             raise
-        print(f"Hata: {exc}", file=sys.stderr)
+        print(t("cli.error", error=exc), file=sys.stderr)
         return EXIT_ERROR
 
 
@@ -195,5 +266,5 @@ if __name__ == "__main__":
     first_arg = sys.argv[1:2][0] if sys.argv[1:2] else ""
     needs_powershell = first_arg in ("gui", "diagnostics", "adapters")
     if needs_powershell and system.is_windows() and not system.powershell_available():
-        print("Uyarı: PowerShell bulunamadı, DNS işlemleri çalışmayabilir.", file=sys.stderr)
+        print(t("report.no_powershell"), file=sys.stderr)
     raise SystemExit(main())

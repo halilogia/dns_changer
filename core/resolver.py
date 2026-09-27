@@ -23,6 +23,7 @@ from urllib.parse import urlencode
 
 from core import system
 from core.providers import DnsProvider
+from i18n import t
 
 DEFAULT_QUERY_NAME = "example.com"
 QUERY_PORT = 53
@@ -61,7 +62,12 @@ class Ipv6Status:
     resolves_aaaa: bool = False
     rtt_ms: float | None = None
     addresses: tuple[str, ...] = ()
-    detail: str = ""
+    detail_key: str = ""
+
+    @property
+    def detail(self) -> str:
+        """Human-readable summary, resolved in the active locale."""
+        return t(self.detail_key) if self.detail_key else ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -447,15 +453,15 @@ def probe_ipv6(name: str = DEFAULT_QUERY_NAME) -> Ipv6Status:
     rtt = icmp_rtt(resolved[0], timeout=1.2) if (global_ok and resolved) else None
 
     if not supported:
-        detail = "IPv6 yığını desteklenmiyor"
+        detail_key = "ipv6.unsupported"
     elif not global_ok:
-        detail = "IPv6 yığını var ancak genel adres yok (yalnızca link-local)"
+        detail_key = "ipv6.no_global"
     elif not resolves:
-        detail = "Genel IPv6 adresi var ancak AAAA kaydı çözülemiyor"
+        detail_key = "ipv6.no_aaaa"
     elif rtt is None:
-        detail = "IPv6 bağlantısı çalışıyor, ICMP yanıtı yok (ICMP engellenmiş olabilir)"
+        detail_key = "ipv6.no_icmp"
     else:
-        detail = "IPv6 bağlantısı sorunsuz"
+        detail_key = "ipv6.ok"
 
     return Ipv6Status(
         supported=supported,
@@ -463,7 +469,7 @@ def probe_ipv6(name: str = DEFAULT_QUERY_NAME) -> Ipv6Status:
         resolves_aaaa=resolves,
         rtt_ms=rtt,
         addresses=global_addresses,
-        detail=detail,
+        detail_key=detail_key,
     )
 
 

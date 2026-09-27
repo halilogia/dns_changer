@@ -56,13 +56,27 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover -s tests -t . -v
       - name: Import check
-        run: python -c "import core.system, core.providers, core.resolver, core.dns_service, core.elevation, diagnostics.report, ui.app; print('imports ok')"
+        run: python -c "import core.system, core.providers, core.resolver, core.dns_service, core.elevation, core.settings, core.updater, diagnostics.report, i18n, ui.app; print('imports ok')"
+      - name: Translation catalogs agree
+        run: |
+          python -c "
+          import i18n.catalog as c
+          tr, en = set(c.TRANSLATIONS['tr']), set(c.TRANSLATIONS['en'])
+          assert tr == en, sorted(tr ^ en)
+          print(f'{len(tr)} keys in both locales')
+          "
       - name: CLI smoke test
         run: python main.py providers
+      - name: CLI in English
+        run: python main.py --locale en providers
+        env:
+          APEX_DNS_CONFIG_DIR: ${{ runner.temp }}/apex-config
       - name: CLI adapter listing
         run: python main.py adapters
       - name: CLI diagnostics (quick)
         run: python main.py diagnostics --quick
+      - name: Update check (offline tolerated)
+        run: python main.py --check-update || true
 
   build:
     name: Build Windows executables
@@ -83,6 +97,7 @@ jobs:
         run: |
           ./dist/ApexDNSDiagnostics.exe providers
           ./dist/ApexDNSDiagnostics.exe --version
+          ./dist/ApexDNSChanger.exe --version
       - name: Upload executables
         uses: actions/upload-artifact@v4
         with:

@@ -25,7 +25,7 @@ dev = [
 apex-dns = "main:main"
 
 [tool.setuptools]
-packages = ["core", "ui", "diagnostics"]
+packages = ["core", "ui", "diagnostics", "i18n"]
 py-modules = ["main"]
 
 [tool.ruff]

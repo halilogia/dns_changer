@@ -35,10 +35,32 @@ python main.py adapters              # ağ bağlantılarını listeler
 python main.py ping 1.1.1.1         # gecikme ve paket kaybı
 python main.py speed                 # bant genişliği
 python main.py providers             # DNS sağlayıcı listesi
+python main.py --check-update        # yeni sürüm var mı kontrol eder
 ```
 
-`dns_changer.py` geriye dönük uyum için korunmuş bir başlatıcıdır ve
-`main.py` dosyasına yönlendirir.
+`--locale tr|en` arayüz ve konsol dilini değiştirir. `dns_changer.py` geriye
+dönük uyum için korunmuş bir başlatıcıdır ve `main.py` dosyasına yönlendirir.
+
+## Ayarlar
+
+Tercihler JSON olarak saklanır ve uygulama kapandığında yazılır: son seçilen
+bağlantı ve sağlayıcı, özel DNS adresleri, pencere boyutu, dil ve güncelleme
+tercihi.
+
+| Platform | Konum |
+| --- | --- |
+| Windows | `%APPDATA%\ApexDNSChanger\settings.json` |
+| macOS | `~/Library/Application Support/ApexDNSChanger/settings.json` |
+| Linux | `~/.config/ApexDNSChanger/settings.json` |
+
+`APEX_DNS_CONFIG_DIR` ortam değişkeni konumu geçici olarak değiştirir. Bozuk
+veya okunamayan bir dosya sessizce varsayılanlara döner.
+
+## Dil
+
+Arayüz, teşhis raporu ve CLI çıktısı Türkçe ve İngilizce sunulur. İlk açılışta
+işletim sistemi diline göre seçilir. `i18n/catalog.py` her iki dili de içerir;
+iki katalogun anahtar ve yer tutucu kümesinin eşleştiği testlerle doğrulanır.
 
 ## Yapı
 
@@ -50,16 +72,20 @@ core/                iş mantığı (GUI bağımsız)
   resolver.py        UDP DNS, DoH ve IPv6 probları (yalnızca standart kütüphane)
   dns_service.py     bağlantı keşfi ve DNS okuma/yazma, platform arka uçları
   elevation.py       yönetici tespiti ve UAC akışı
+  settings.py        kalıcı kullanıcı tercihleri
+  updater.py         GitHub sürüm kontrolü
+i18n/                çeviri katalogları ve t() işlevi
 ui/                  tkinter katmanı
   theme.py           renkler, yazı tipleri, ttk stilleri
   widgets.py         DnsCard, ProviderList, AdapterBar, CustomDnsForm, StatusFooter
+  details.py         bağlantı detayları penceresi
   app.py             pencere denetleyicisi
 diagnostics/         konsol teşhisi
   speedtest.py       bant genişliği, ping, işlem başına ağ kullanımı
   netusage.py        ağ kullanımı örneklemesi
   report.py          metin ve JSON rapor üretimi
-packaging/           PyInstaller spec, UAC manifesti, ikon, build betiği
-tools/               ikon üretimi ve manifest doğrulama
+packaging/           PyInstaller spec, UAC manifesti, ikon, build ve imzalama
+tools/               ikon üretimi, manifest doğrulama, arayüz teşhisi
 tests/               birim testleri (çapraz platform)
 ```
 
@@ -96,6 +122,31 @@ UAC seviyesini doğrulamak için:
 ```bash
 python tools/check_manifest.py dist/ApexDNSChanger.exe dist/ApexDNSDiagnostics.exe
 ```
+
+### İmzalama
+
+İmzasız ikili dosyalar ilk çalıştırmada SmartScreen uyarısı gösterir.
+`build.ps1` derlemeden sonra `packaging/sign.ps1` çağırır; sertifika yoksa
+adımlar sessizce atlanır. Sertifika parmak izi `APEX_CERT_THUMBPRINT`
+ortam değişkeni veya `-Thumbprint` ile verilir:
+
+```powershell
+$env:APEX_CERT_THUMBPRINT = "0123456789ABCDEF..."
+pwsh -File packaging/build.ps1
+pwsh -File packaging/sign.ps1 -Path dist -RequireSignature   # CI'da zorunlu kıl
+```
+
+`signtool.exe` varsa o kullanılır, yoksa `Set-AuthenticodeSignature`'a düşer.
+
+### Kurulum paketi
+
+```powershell
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\apex_dns.iss
+```
+
+İki görevi isteğe bağlıdır: masaüstü kısayolu ve otomatik güncelleme kontrolü.
+Kısayol yönetici yetkisi gerektirmez; yükseltme exe içindeki
+`requireAdministrator` manifesti üzerinden gelir.
 
 Kaynak kodla çalışırken UAC yükseltmesi `core/elevation.py` tarafından yapılır;
 `--no-elevation` ile atlanabilir.

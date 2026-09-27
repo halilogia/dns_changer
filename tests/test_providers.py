@@ -7,10 +7,11 @@ import unittest
 from core.dns_service import is_valid_ip
 from core.providers import (
     ALL_ADAPTERS_ID,
-    ALL_ADAPTERS_LABEL,
     CUSTOM_PROVIDER_ID,
     DEFAULT_PROVIDERS,
     DnsProvider,
+    all_adapters_label,
+    custom_provider_label,
     doh_providers,
     find_by_id,
     get_provider,
@@ -80,7 +81,30 @@ class TestCatalog(unittest.TestCase):
         self.assertTrue(quad9.doh_requires_http2)
 
     def test_all_adapters_sentinel(self):
-        self.assertNotEqual(ALL_ADAPTERS_ID, ALL_ADAPTERS_LABEL)
+        self.assertNotEqual(ALL_ADAPTERS_ID, all_adapters_label())
+
+    def test_all_adapters_label_is_localized(self):
+        from i18n import set_locale
+
+        try:
+            set_locale("en")
+            english = all_adapters_label()
+            set_locale("tr")
+            turkish = all_adapters_label()
+        finally:
+            set_locale("tr")
+        self.assertNotEqual(english, turkish)
+
+    def test_custom_provider_label_is_localized(self):
+        from i18n import set_locale
+
+        try:
+            set_locale("en")
+            english = custom_provider_label()
+        finally:
+            set_locale("tr")
+        self.assertEqual(english, "Custom DNS")
+        self.assertEqual(custom_provider_label(), "Özel DNS")
 
 
 class TestDnsProvider(unittest.TestCase):
@@ -107,6 +131,15 @@ class TestDnsProvider(unittest.TestCase):
 
     def test_display_servers_placeholder_when_empty(self):
         self.assertIn("manuel", self.make().display_servers())
+
+    def test_label_desc_badge_resolve_from_keys(self):
+        provider = self.make(name_key="provider.custom", desc_key="provider.cloudflare.desc")
+        self.assertIn("DNS", provider.label)
+        self.assertTrue(provider.desc)
+        self.assertEqual(provider.badge, "")
+
+    def test_literal_label_falls_back_to_name(self):
+        self.assertEqual(self.make(name="Plain").label, "Plain")
 
     def test_as_custom_returns_new_instance(self):
         original = self.make()
