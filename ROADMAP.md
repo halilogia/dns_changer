@@ -16,12 +16,15 @@ Items are ordered by impact-per-effort.
       optional desktop shortcut. Not yet compiled: Inno Setup is not
       installed locally, so it is verified by inspection only.
 - [x] **Auto-update.** `core/updater.py` plus a startup prompt and
-      `--check-update`. Not yet exercised against a live release, because the
-      repository is not published.
+      `--check-update`. The check reaches the API now that the repository is
+      published, but it has no release to find until one is tagged.
 - [x] **Persist user settings.** `core/settings.py`, atomic and
       corruption-tolerant.
 - [x] **Localization.** Turkish and English across UI, report and CLI.
 - [x] **Failure reporting.** `ui/details.py` connection detail window.
+- [x] **Continuous integration.** Lint plus tests on Ubuntu, Windows and macOS,
+      a Windows build job that asserts the UAC level, and a separate job for
+      the tests that need real network access.
 
 ## v2.2 — Networking depth
 
@@ -56,5 +59,13 @@ Items are ordered by impact-per-effort.
 - Encrypted DNS as the default rather than an opt-in measurement.
 - Per-domain override table.
 - Telemetry, opt-in and off by default.
-- Publish the repository so releases exist and auto-update has something to
-  find; this currently blocks verifying both the installer and the updater.
+
+## Blocked on something outside the code
+
+- **Tag a release.** The repository is public, but with no tagged release the
+  updater has nothing to offer and `diagnostics-json` reports the check as
+  failed. This also gates verifying the Inno Setup installer end to end.
+- **Obtain a code-signing certificate.** The pipeline is done; only the
+  certificate is missing.
+- **Install Inno Setup.** `apex_dns.iss` has never been compiled, so it is
+  verified by inspection only.
