@@ -1,0 +1,8 @@
+# Runtime dependencies
+requests>=2.31.0
+psutil>=5.9.0
+
+# Needed for DNS-over-HTTPS endpoints that require HTTP/2. Quad9 answers
+# HTTP/1.1 with "505 HTTP Version Not Supported" per RFC 8484 section 5.2.
+# The app degrades gracefully and reports the reason when httpx is absent.
+httpx[http2]>=0.27.0

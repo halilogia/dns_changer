@@ -3,3 +3,22 @@ __pycache__/
 *.pyo
 *.pyd
 .DS_Store
+
+# Build output
+build/
+dist/
+.venv-build/
+*.manifest.bak
+
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Generated during a local PyInstaller run
+*.log
+
+archives/
+archive/

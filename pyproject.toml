@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apex-dns-changer"
+version = "2.0.0"
+description = "DNS degistirici ve ag teshis araci"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = [
+    "requests>=2.31.0",
+    "psutil>=5.9.0",
+    "httpx[http2]>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6.0",
+    "pyinstaller>=6.10.0",
+]
+
+[project.scripts]
+apex-dns = "main:main"
+
+[tool.setuptools]
+packages = ["core", "ui", "diagnostics"]
+py-modules = ["main"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [".venv-build", "build", "dist", "packaging"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "C4",   # comprehensions
+    "SIM",  # simplify
+]
+ignore = [
+    "E501",    # long lines are handled by the formatter
+    "B008",    # tkinter callbacks are call expressions by design
+    "SIM108",  # ternaries are not always clearer
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
+"packaging/apex_dns.spec" = ["F821", "E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "ui", "diagnostics", "main"]

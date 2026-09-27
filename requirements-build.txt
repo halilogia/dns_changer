@@ -1,0 +1,2 @@
+# Build-time only: packaging the executables
+pyinstaller>=6.10.0
