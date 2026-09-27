@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from core import resolver
 from diagnostics import report, speedtest
+from i18n import DEFAULT_LOCALE, set_locale, t
 from tests import ROOT  # noqa: F401
 from tests.support import requires_network
 
@@ -36,6 +37,11 @@ class TestSummarizeLoss(unittest.TestCase):
 
 
 class TestRunDiagnosticsRendering(unittest.TestCase):
+    def setUp(self):
+        # main.main() called by TestCLI changes the process-global locale, so
+        # pin it here instead of depending on test execution order.
+        set_locale(DEFAULT_LOCALE)
+
     def build_report(self):
         return {
             "platform": {"public_ipv4": "203.0.113.9"},
@@ -82,17 +88,23 @@ class TestRunDiagnosticsRendering(unittest.TestCase):
 
     def test_report_contains_sections(self):
         output = self.render()
-        for expected in ("DNS Yanıt", "DoH", "IPv6", "Ağ Bağlantıları", "TEŞHİS ÖZETİ"):
-            self.assertIn(expected, output, expected)
+        for key in (
+            "report.dns_section",
+            "report.doh_section",
+            "report.ipv6_section",
+            "report.adapters_section",
+            "report.summary_title",
+        ):
+            self.assertIn(t(key), output, key)
 
     def test_latency_values_rendered(self):
         self.assertIn("7.5 ms", self.render())
 
     def test_timeout_rendered_for_unreachable(self):
-        self.assertIn("Zaman Aşımı", self.render())
+        self.assertIn(t("report.dns_timeout"), self.render())
 
     def test_ipv6_gap_is_reported_as_advice(self):
-        self.assertIn("IPv6 genel adresi yok", self.render())
+        self.assertIn(t("report.no_ipv6"), self.render())
 
     def test_adapter_flags_rendered(self):
         self.assertIn("DHCP", self.render())
@@ -116,7 +128,7 @@ class TestRunDiagnosticsRendering(unittest.TestCase):
         with patch.object(report, "build_report", return_value=data):
             stream = io.StringIO()
             report.run_diagnostics(stream=stream)
-        self.assertIn("Bant genişliği düşük", stream.getvalue())
+        self.assertIn(t("report.low_bandwidth", value=1.0), stream.getvalue())
 
     def test_dns_latency_advice(self):
         data = self.build_report()
@@ -124,7 +136,7 @@ class TestRunDiagnosticsRendering(unittest.TestCase):
         with patch.object(report, "build_report", return_value=data):
             stream = io.StringIO()
             report.run_diagnostics(stream=stream)
-        self.assertIn("DNS gecikmesi yüksek", stream.getvalue())
+        self.assertIn(t("report.high_dns_latency"), stream.getvalue())
 
 
 @requires_network
@@ -271,6 +283,10 @@ class TestBuildReportShape(unittest.TestCase):
 
 
 class TestCLI(unittest.TestCase):
+    def tearDown(self):
+        # main.main() resolves and sets the process-global locale.
+        set_locale(DEFAULT_LOCALE)
+
     def test_parser_builds(self):
         import main
 

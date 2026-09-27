@@ -130,21 +130,36 @@ class TestTranslate(unittest.TestCase):
 
 
 class TestDetect(unittest.TestCase):
+    LOCALE_VARS = ("APEX_DNS_LOCALE", "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG")
+
+    def _detect_with(self, **values):
+        # Every locale variable must be overridden: LC_ALL outranks LANG, so a
+        # stale value in the ambient environment would win.
+        environment = dict.fromkeys(self.LOCALE_VARS, "")
+        environment.update(values)
+        with mock.patch.dict(os.environ, environment):
+            return detect_locale()
+
     def test_explicit_override_wins(self):
-        with mock.patch.dict(os.environ, {"APEX_DNS_LOCALE": "en"}, clear=False):
-            self.assertEqual(detect_locale(), "en")
+        self.assertEqual(self._detect_with(APEX_DNS_LOCALE="en"), "en")
 
     def test_lang_variable(self):
-        with mock.patch.dict(os.environ, {"APEX_DNS_LOCALE": "", "LANG": "en_US.UTF-8"}, clear=False):
-            self.assertEqual(detect_locale(), "en")
+        self.assertEqual(self._detect_with(LANG="en_US.UTF-8"), "en")
+
+    def test_lc_all_outranks_lang(self):
+        self.assertEqual(self._detect_with(LC_ALL="en_US.UTF-8", LANG="tr_TR.UTF-8"), "en")
 
     def test_stripped_modifier(self):
-        with mock.patch.dict(os.environ, {"APEX_DNS_LOCALE": "", "LANG": "tr_TR.UTF-8"}, clear=False):
-            self.assertEqual(detect_locale(), "tr")
+        self.assertEqual(self._detect_with(LANG="tr_TR.UTF-8"), "tr")
+
+    def test_colon_separated_list(self):
+        self.assertEqual(self._detect_with(LANG="tr_TR:en_US"), "tr")
 
     def test_unknown_locale_falls_back(self):
-        with mock.patch.dict(os.environ, {"APEX_DNS_LOCALE": "de_DE"}, clear=False):
-            self.assertEqual(detect_locale(), DEFAULT_LOCALE)
+        self.assertEqual(self._detect_with(APEX_DNS_LOCALE="de_DE"), DEFAULT_LOCALE)
+
+    def test_empty_environment_falls_back(self):
+        self.assertEqual(self._detect_with(), DEFAULT_LOCALE)
 
 
 class TestUserVisibleStringsAreTranslated(unittest.TestCase):

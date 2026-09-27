@@ -38,24 +38,29 @@ def normalize(code: str) -> str:
 
 
 def detect_locale() -> str:
-    """Best guess at the user's language from the environment."""
+    """Best guess at the user's language from the environment.
+
+    Only a system language that is actually supported is honoured; anything
+    else falls back to :data:`DEFAULT_LOCALE`, so the behaviour is the same on
+    Windows (no ``LANG``) and on POSIX.
+    """
     for variable in ("APEX_DNS_LOCALE", "LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"):
         value = os.environ.get(variable)
         if value:
             return normalize(value.split(":")[0])
     from core import system
 
-    if system.is_windows():
-        try:
-            import ctypes
+    if not system.is_windows():
+        return DEFAULT_LOCALE
+    try:
+        import ctypes
 
-            windll = ctypes.windll
-            windll.kernel32.GetUserDefaultUILanguage.restype = ctypes.c_ulong
-            language_id = int(windll.kernel32.GetUserDefaultUILanguage())
-        except Exception:
-            return DEFAULT_LOCALE
-        return normalize({0x041F: "tr"}.get(language_id, ""))
-    return DEFAULT_LOCALE
+        windll = ctypes.windll
+        windll.kernel32.GetUserDefaultUILanguage.restype = ctypes.c_ulong
+        language_id = int(windll.kernel32.GetUserDefaultUILanguage())
+    except Exception:
+        return DEFAULT_LOCALE
+    return normalize({0x041F: "tr", 0x0409: "en"}.get(language_id, ""))
 
 
 def get_locale() -> str:

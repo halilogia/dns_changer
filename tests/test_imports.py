@@ -107,8 +107,14 @@ class TestCommandLine(unittest.TestCase):
         self.assertIn("DoH", completed.stdout)
 
     def test_providers_output_is_utf8_clean(self):
-        completed = run_cli("providers")
+        # Pin the locale: the runner environment may be English.
+        completed = run_cli("--locale", "tr", "providers")
         self.assertIn("\u00d6zel DNS", completed.stdout)
+
+    def test_providers_renders_in_english(self):
+        completed = run_cli("--locale", "en", "providers")
+        self.assertIn("Custom DNS", completed.stdout)
+        self.assertNotIn("\u00d6zel DNS", completed.stdout)
 
     def test_version(self):
         completed = run_cli("--version")

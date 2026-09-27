@@ -26,7 +26,7 @@ def summarize_loss(ping_output: str) -> str | None:
     loss = system.parse_ping_loss(ping_output)
     if loss is None:
         return tail or None
-    return f"{loss}% {t('report.lost')} — {tail}".strip(" —")
+    return f"{loss}% — {tail}".strip(" —")
 
 
 def collect_dns_results(timeout: float = 1.2) -> dict[str, float | None]:
