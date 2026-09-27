@@ -44,10 +44,23 @@ class TestPaths(TempDirMixin):
         ):
             self.assertIn("Roaming", str(store.settings_dir()))
 
-    @unittest.skipIf(store.system.is_windows(), "POSIX path convention")
+    @unittest.skipUnless(
+        store.system.current_platform() == store.system.LINUX,
+        "XDG_CONFIG_HOME is the Linux convention only",
+    )
     def test_posix_default_uses_xdg(self):
         with mock.patch.dict(os.environ, {"APEX_DNS_CONFIG_DIR": "", "XDG_CONFIG_HOME": "/tmp/xdg"}):
             self.assertIn("xdg", str(store.settings_dir()))
+
+    @unittest.skipUnless(
+        store.system.current_platform() == store.system.MACOS,
+        "macOS uses Application Support, not XDG",
+    )
+    def test_macos_default_uses_application_support(self):
+        with mock.patch.dict(os.environ, {"APEX_DNS_CONFIG_DIR": "", "XDG_CONFIG_HOME": "/tmp/xdg"}):
+            path = str(store.settings_dir())
+        self.assertIn("Application Support", path)
+        self.assertNotIn("xdg", path)
 
 
 class TestRoundTrip(TempDirMixin):

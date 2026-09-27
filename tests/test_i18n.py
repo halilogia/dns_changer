@@ -6,6 +6,7 @@ import os
 import unittest
 from unittest import mock
 
+from core import system
 from i18n import (
     DEFAULT_LOCALE,
     available_locales,
@@ -159,7 +160,18 @@ class TestDetect(unittest.TestCase):
         self.assertEqual(self._detect_with(APEX_DNS_LOCALE="de_DE"), DEFAULT_LOCALE)
 
     def test_empty_environment_falls_back(self):
-        self.assertEqual(self._detect_with(), DEFAULT_LOCALE)
+        # With no locale variables there is nothing to read, so the result is
+        # the app default. On Windows the OS language is consulted next, which
+        # is a separate path.
+        with mock.patch("core.system.is_windows", return_value=False):
+            self.assertEqual(self._detect_with(), DEFAULT_LOCALE)
+
+    def test_windows_consults_the_system_language(self):
+        if not system.is_windows():
+            self.skipTest("windows only")
+        # A runner or desktop with an English UI language yields English; the
+        # important part is that the result is always a supported locale.
+        self.assertIn(self._detect_with(), available_locales())
 
 
 class TestUserVisibleStringsAreTranslated(unittest.TestCase):
