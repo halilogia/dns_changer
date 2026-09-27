@@ -8,9 +8,13 @@ end to end in a subprocess.
 from __future__ import annotations
 
 import importlib
+import json
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 from tests import ROOT
 
@@ -121,14 +125,20 @@ class TestCommandLine(unittest.TestCase):
             self.assertIn(command, completed.stdout)
 
     def test_diagnostics_json_is_parseable(self):
-        completed = run_cli("diagnostics-json")
+        # --quick keeps this off the 35 MB bandwidth transfer.
+        completed = run_cli("diagnostics-json", "--quick")
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        import json
-
         payload = json.loads(completed.stdout)
         self.assertIn("dns", payload)
         self.assertIn("ipv6", payload)
         self.assertIn("platform", payload)
+
+    def test_settings_file_is_written(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.dict(os.environ, {"APEX_DNS_CONFIG_DIR": directory}):
+                completed = run_cli("--no-update-check", "providers")
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(os.path.isfile(os.path.join(directory, "settings.json")))
 
 
 if __name__ == "__main__":

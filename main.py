@@ -52,7 +52,8 @@ def build_parser() -> argparse.ArgumentParser:
     diagnostics = sub.add_parser("diagnostics", help=t("cli.report_description"))
     diagnostics.add_argument("--quick", action="store_true", help=t("cli.quick"))
 
-    sub.add_parser("diagnostics-json", help=t("cli.report_description"))
+    diagnostics_json = sub.add_parser("diagnostics-json", help=t("cli.report_description"))
+    diagnostics_json.add_argument("--quick", action="store_true", help=t("cli.quick"))
 
     ping = sub.add_parser("ping", help=t("cli.ping"))
     ping.add_argument("host", nargs="?", default="8.8.8.8")

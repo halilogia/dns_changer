@@ -6,7 +6,7 @@ import unittest
 
 from core import dns_service as ds
 from core.providers import ALL_ADAPTERS_ID
-from tests import ROOT  # noqa: F401  (adds the project root to sys.path)
+from tests import ROOT  # noqa: F401
 
 
 class TestIsValidIp(unittest.TestCase):

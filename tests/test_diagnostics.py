@@ -11,6 +11,7 @@ from unittest.mock import patch
 from core import resolver
 from diagnostics import report, speedtest
 from tests import ROOT  # noqa: F401
+from tests.support import requires_network
 
 
 class TestSummarizeLoss(unittest.TestCase):
@@ -126,6 +127,7 @@ class TestRunDiagnosticsRendering(unittest.TestCase):
         self.assertIn("DNS gecikmesi yüksek", stream.getvalue())
 
 
+@requires_network
 class TestCollectDnsResults(unittest.TestCase):
     def test_maps_provider_names_to_latency(self):
         with patch.object(resolver, "measure_dns_latency", return_value=5.0):
@@ -139,6 +141,7 @@ class TestCollectDnsResults(unittest.TestCase):
         self.assertTrue(all(call.kwargs.get("timeout") == 0.42 for call in measure.call_args_list))
 
 
+@requires_network
 class TestCollectDohResults(unittest.TestCase):
     def test_serialises_doh_results(self):
         payload = report.collect_doh_results()
@@ -242,6 +245,7 @@ class TestNetUsage(unittest.TestCase):
             self.assertEqual(speedtest.get_top_network_usage(sample_seconds=0), [])
 
 
+@requires_network
 class TestBuildReportShape(unittest.TestCase):
     def test_quick_report_has_expected_keys(self):
         data = report.build_report(quick=True)

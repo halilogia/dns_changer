@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import platform
 import subprocess
 import time
 
 import psutil
 import requests
+
+from core import system
 
 DEFAULT_DOWNLOAD_BYTES = 25_000_000
 DEFAULT_UPLOAD_BYTES = 10_000_000
@@ -72,12 +73,24 @@ def get_top_network_usage(sample_seconds: int = 2, limit: int = 5) -> list[tuple
 
 
 def test_latency_and_loss(host: str = "8.8.8.8", count: int = 10) -> str:
-    """Raw ping output, or the error text when the probe could not run."""
-    parameter = "-n" if platform.system().lower().startswith("win") else "-c"
-    command = ["ping", parameter, str(count), host]
-    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if platform.system().lower().startswith("win") else 0
+    """Raw ping output, or the error text when the probe could not run.
+
+    The subprocess is bounded: some platforms let ``ping`` block indefinitely
+    when the host has no usable route, which would hang the whole report.
+    """
+    command = system.ping_command(host, count=count)
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if system.is_windows() else 0
+    timeout = 5.0 + max(1, count) * 1.5
     try:
-        return subprocess.check_output(command, stderr=subprocess.STDOUT, text=True, creationflags=flags)
+        return subprocess.check_output(
+            command,
+            stderr=subprocess.STDOUT,
+            text=True,
+            creationflags=flags,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return f"ping timed out after {timeout:.0f}s"
     except subprocess.CalledProcessError as exc:
         return exc.output or str(exc)
     except OSError as exc:

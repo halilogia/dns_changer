@@ -101,14 +101,32 @@ class TestPingParsing(unittest.TestCase):
 
 
 class TestPingCommand(unittest.TestCase):
-    def test_count_appears_in_command(self):
-        for _ in range(1):
-            self.assertIn("4", system.ping_command("1.1.1.1", count=4, timeout_ms=1000))
-
-    def test_timeout_is_included(self):
-        command = " ".join(system.ping_command("1.1.1.1", count=1, timeout_ms=750))
-        self.assertIn("750", command)
+    def test_host_and_count_are_present(self):
+        command = system.ping_command("1.1.1.1", count=4, timeout_ms=1000)
         self.assertIn("1.1.1.1", command)
+        self.assertIn("4", command)
+
+    def test_count_flag_matches_platform(self):
+        command = system.ping_command("1.1.1.1", count=4)
+        self.assertEqual(command[1], "-n" if system.is_windows() else "-c")
+
+    def test_timeout_is_passed_in_the_right_unit(self):
+        # Windows and macOS take milliseconds for -w / -W; Linux takes seconds.
+        command = system.ping_command("1.1.1.1", count=1, timeout_ms=750)
+        rendered = " ".join(command)
+        if system.is_windows() or system.current_platform() == system.MACOS:
+            self.assertIn("750", rendered)
+        else:
+            self.assertIn("1", rendered)
+            self.assertNotIn("750", rendered)
+
+    def test_sub_second_timeout_never_rounds_to_zero(self):
+        command = system.ping_command("1.1.1.1", count=1, timeout_ms=100)
+        rendered = " ".join(command)
+        if system.is_windows() or system.current_platform() == system.MACOS:
+            self.assertIn("100", rendered)
+        else:
+            self.assertIn("-W 1", rendered)
 
 
 class TestPowerShellQuoting(unittest.TestCase):

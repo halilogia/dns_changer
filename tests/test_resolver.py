@@ -10,6 +10,7 @@ from unittest import mock
 from core import resolver
 from core.providers import DnsProvider
 from tests import ROOT  # noqa: F401
+from tests.support import requires_network
 
 
 class TestBuildQuery(unittest.TestCase):
@@ -87,6 +88,7 @@ class TestParseMessage(unittest.TestCase):
         self.assertEqual(b"\xc0\x0c", packet[-16:-14])
 
 
+@requires_network
 class TestQueryUdp(unittest.TestCase):
     def test_invalid_server_reports_error(self):
         probe = resolver.query_udp("not-an-ip")
@@ -255,6 +257,7 @@ class TestDohTransportSelection(unittest.TestCase):
         self.assertIn(405, resolver._DOH_RETRY_STATUS)
 
 
+@requires_network
 class TestDohEndpoints(unittest.TestCase):
     def test_provider_without_endpoint_is_rejected(self):
         provider = DnsProvider(name="Yok", provider_id="yok")
@@ -295,6 +298,7 @@ class TestDohEndpoints(unittest.TestCase):
         self.assertFalse(result.ok)
 
 
+@requires_network
 class TestIpv6Probe(unittest.TestCase):
     def test_returns_status_object(self):
         status = resolver.probe_ipv6()
