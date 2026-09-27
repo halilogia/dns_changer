@@ -1,10 +1,10 @@
 # Roadmap
 
-Planning document for Apex DNS Changer. Completed work lives in
-[CHANGELOG.md](CHANGELOG.md).
+Planning document for Apex DNS Changer. This file contains **open work only** —
+completed work is recorded in [CHANGELOG.md](CHANGELOG.md) and removed from here
+as it ships.
 
-Items are ordered by impact-per-effort. Anything marked **Done** is already
-shipped and recorded in the changelog.
+Items are ordered by impact-per-effort.
 
 ## v2.1 — Ship quality and everyday usability
 
@@ -56,15 +56,3 @@ shipped and recorded in the changelog.
 - Encrypted DNS as the default rather than an opt-in measurement.
 - Per-domain override table.
 - Telemetry, opt-in and off by default.
-
-## Done
-
-- [x] Split the 718-line monolith into `core` / `ui` / `diagnostics`.
-- [x] DoH measurement and IPv6 health check.
-- [x] PyInstaller `.exe` build with a correct UAC flow.
-- [x] Cross-platform core (Linux `nmcli` backend, macOS read-only backend).
-- [x] CI: lint, multi-OS tests, Windows build with manifest assertion.
-- [x] Fix the `NameError` in the `--ping` command.
-- [x] Fix worker-thread `after()` calls that silently broke the UI.
-- [x] Strict IPv4/IPv6 address validation.
-- [x] Non-blocking UI during DNS operations.
